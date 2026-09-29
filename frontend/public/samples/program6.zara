@@ -1,0 +1,9 @@
+set grade = 72
+when grade > 90:
+    show "A"
+otherwise when grade > 75:
+    show "B"
+otherwise when grade > 60:
+    show "C"
+otherwise:
+    show "F"
