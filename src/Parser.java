@@ -1,32 +1,56 @@
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
+import java.util.Map;
 
 public class Parser {
 
     private final List<Token> tokens; // list of tokens from lexer
     private int current; // pointer to current token
-    private Set<Integer> indentedLines; // tracks indented lines for block parsing
+    private Map<Integer, Integer> lineIndent; // line number -> indentation width (0 if unindented)
+    private final List<String> warnings = new ArrayList<>(); // recoverable parse issues (unexpected tokens)
 
     // Initialize parser with token list
     public Parser(List<Token> tokens) {
         this.tokens = tokens;
         this.current = 0;
-        this.indentedLines = Set.of();
+        this.lineIndent = Map.of();
     }
 
-    // Preprocess source to detect indented lines
+    // Non-fatal issues collected during parsing (e.g. skipped unexpected-token lines).
+    // Never written to System.err directly -- the caller decides how to surface them,
+    // since this parser has no idea whether it's running in a CLI or a web request.
+    public List<String> getWarnings() {
+        return warnings;
+    }
+
+    // Preprocess source to measure each line's indentation width, so nested blocks
+    // can tell a sibling statement (same depth) apart from a dedent back to an
+    // enclosing block (shallower depth) -- both are merely "indented" in isolation.
     public void setSource(String source) {
         String[] lines = source.split("\n", -1);
+        Map<Integer, Integer> indent = new HashMap<>();
 
-        indentedLines = IntStream.range(0, lines.length)
-            .filter(i -> lines[i].length() > 0
-                      && (lines[i].charAt(0) == ' ' || lines[i].charAt(0) == '\t'))
-            .map(i -> i + 1) // convert to 1-based line numbers
-            .boxed()
-            .collect(Collectors.toSet());
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
+            int width = 0;
+            while (width < line.length() && (line.charAt(width) == ' ' || line.charAt(width) == '\t')) {
+                width++;
+            }
+            if (width > 0) {
+                indent.put(i + 1, width); // 1-based line numbers
+            }
+        }
+
+        this.lineIndent = indent;
+    }
+
+    private int indentOf(int line) {
+        return lineIndent.getOrDefault(line, 0);
+    }
+
+    private int currentIndent() {
+        return indentOf(peek().getLine());
     }
 
     // Main parse function: builds list of instructions
@@ -53,7 +77,7 @@ public class Parser {
             case LOOP:  return parseLoop();
             case WHILE: return parseWhile();
             default:
-                System.err.println("Unexpected token at line "
+                warnings.add("Unexpected token at line "
                     + peek().getLine() + ": '" + peek().getValue() + "'");
                 skipLine(); // skip invalid line
                 return null;
@@ -84,6 +108,8 @@ public class Parser {
 
     // Parse IF condition block, with optional OTHERWISE / OTHERWISE WHEN (else-if) clause
     private IfInstruction parseIf() {
+        int headerDepth = currentIndent(); // indentation of the 'when' line itself
+
         consume(TokenType.WHEN);
 
         Expression condition = parseExpression(); // condition expression
@@ -91,11 +117,13 @@ public class Parser {
         consume(TokenType.COLON);
         skipNewlines();
 
-        List<Instruction> thenBody = parseBlock(); // parse indented block
+        List<Instruction> thenBody = parseBlock(headerDepth); // parse indented block
 
         List<Instruction> elseBody = List.of();
 
-        if (check(TokenType.OTHERWISE)) {
+        // Only treat OTHERWISE as belonging to *this* when if it sits at the same
+        // depth as the when itself -- otherwise it belongs to some enclosing block.
+        if (check(TokenType.OTHERWISE) && currentIndent() == headerDepth) {
             advance();
 
             if (check(TokenType.WHEN)) {
@@ -104,7 +132,7 @@ public class Parser {
             } else {
                 consume(TokenType.COLON);
                 skipNewlines();
-                elseBody = parseBlock();
+                elseBody = parseBlock(headerDepth);
             }
         }
 
@@ -113,6 +141,8 @@ public class Parser {
 
     // Parse LOOP block (fixed iteration count)
     private RepeatInstruction parseLoop() {
+        int headerDepth = currentIndent();
+
         consume(TokenType.LOOP);
 
         double val = Double.parseDouble(consume(TokenType.NUMBER).getValue());
@@ -127,11 +157,13 @@ public class Parser {
         consume(TokenType.COLON);
         skipNewlines();
 
-        return new RepeatInstruction(count, parseBlock()); // parse loop body
+        return new RepeatInstruction(count, parseBlock(headerDepth)); // parse loop body
     }
 
     // Parse WHILE block (condition-driven loop)
     private WhileInstruction parseWhile() {
+        int headerDepth = currentIndent();
+
         consume(TokenType.WHILE);
 
         Expression condition = parseExpression();
@@ -139,19 +171,21 @@ public class Parser {
         consume(TokenType.COLON);
         skipNewlines();
 
-        return new WhileInstruction(condition, parseBlock());
+        return new WhileInstruction(condition, parseBlock(headerDepth));
     }
 
-    // Parse a block of indented instructions
-    private List<Instruction> parseBlock() {
+    // Parse a block of instructions nested more deeply than headerDepth (the
+    // indentation of the block's own opening line, e.g. the 'when'/'loop'/'while').
+    // Stops as soon as a line's indentation drops back to headerDepth or shallower --
+    // that line belongs to an enclosing block, not this one.
+    private List<Instruction> parseBlock(int headerDepth) {
         List<Instruction> block = new ArrayList<>();
 
         while (!isAtEnd()) {
             while (check(TokenType.NEWLINE)) advance(); // skip blank lines
             if (isAtEnd()) break;
 
-            // stop when indentation ends
-            if (!indentedLines.contains(peek().getLine())) break;
+            if (currentIndent() <= headerDepth) break; // dedented out of this block
 
             Instruction inst = parseInstruction();
             if (inst != null) block.add(inst);

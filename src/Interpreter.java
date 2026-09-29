@@ -20,6 +20,10 @@ public class Interpreter {
             parser.setSource(sourceCode);   // needed for indentation block detection
             List<Instruction> instructions = parser.parse();
 
+            for (String warning : parser.getWarnings()) {
+                env.print("Warning: " + warning);
+            }
+
             // Stage 3: Execute
             instructions.forEach(inst -> inst.execute(env));
 
