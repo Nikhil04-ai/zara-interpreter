@@ -1,0 +1,4 @@
+set x = 10
+set y = 3
+set result = x + y * 2
+show result
