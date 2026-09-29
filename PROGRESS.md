@@ -47,11 +47,14 @@ Status key: `[ ]` not started · `[~]` in progress · `[x]` done and verified
 - [ ] Tokenizer/Parser/Interpreter unit tests (precedence, parens, otherwise, while) — the 64-case shell suite from Phase 1 covers this behaviorally; still need proper JUnit versions for CI
 
 ## Phase 4 — Frontend
-- [ ] Vite + React scaffold
-- [ ] Code editor component
-- [ ] Run button + output/error panel
-- [ ] Sample-program picker
-- [ ] Loading/error states
+- [x] Vite + React scaffold — `frontend/` (React 19, Vite 8), builds clean (`npm run build`, `npm run lint` both pass with zero issues)
+- [x] Code editor component — `@uiw/react-codemirror` (plain text mode, no custom ZARA language grammar -- out of scope for MVP; line numbers/bracket-matching still work via CodeMirror's `basicSetup`)
+- [x] Run button + output/error panel — [App.jsx](frontend/src/App.jsx): success output in a `<pre>`, interpreter errors in a red banner, network/transport failures in a distinct orange banner (via [api.js](frontend/src/api.js), which only throws on transport failure -- a ZARA program error is a normal response, not an exception)
+- [x] Sample-program picker — dropdown loading `sample/program1-4.zara` (copied into `frontend/public/samples/`, served as static files)
+- [x] Loading/error states — Run button shows "Running…" and disables during a request; `Ctrl+Enter` also triggers a run
+- [x] **Verified live in the browser** (Claude Code's browser pane, via `.claude/launch.json` running `npm run dev`). Since the real Spring Boot backend can't bind a port on this Windows machine (same JDK/loopback issue as Phase 2), used a throwaway Node mock server matching the real `{output, error}` shape to exercise the actual fetch/render cycle end-to-end. Confirmed: sample picker loads and populates the editor; Run produces correct output; a simulated interpreter error renders the red banner with partial-output handling; killing the mock backend and re-running renders the orange network-error banner with a clear message; restarting the backend and re-running (via `Ctrl+Enter`) recovers correctly; responsive layout correctly switches between side-by-side (wide) and stacked (narrow) panes.
+- One incidental finding during manual testing: reused a stale element reference across two browser actions, which caused a click to land on the sample `<select>` instead of the editor (typing "s..." jump-selected "Strings") -- a testing-methodology mistake, not an app bug; recovered by re-querying the page and retrying. Noted here only because it's a good reminder for future browser-driven testing in this repo: re-fetch element references after any action that could re-render the page.
+- Not yet done: full integration against the *real* Spring Boot backend (blocked by the same local Windows quirk as Phase 2) -- planned for Phase 5 once deployed, or sooner if Docker/another machine becomes available.
 
 ## Phase 5 — Deploy
 - [ ] Backend deployed to Render, health check passing

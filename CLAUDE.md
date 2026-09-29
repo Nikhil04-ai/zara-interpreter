@@ -22,15 +22,23 @@ backend/                              Spring Boot app (Maven).
                                         timeout), CorsConfig, GlobalExceptionHandler.
   src/test/java/...                    JUnit/MockMvc tests.
   Dockerfile                           Multi-stage build -> runnable jar.
-frontend/        React + Vite SPA (Phase 4, not yet scaffolded). Code editor,
-                 Run button, output/error panel, sample-program picker.
-sample/          Example .zara programs (repo root, shared by the CLI demo and
-                 the future frontend's sample picker).
+frontend/        React + Vite SPA -- a browser ZARA playground.
+  src/App.jsx      Layout, run/loading/error state, Ctrl+Enter shortcut.
+  src/api.js       runZara(code) -- POSTs to VITE_API_URL + /api/run, throws
+                    only on transport failure (a ZARA program error is a normal
+                    200 with a non-null `error` field, not an exception).
+  src/samples.js    Sample-picker metadata + loader, fetches public/samples/*.zara.
+  public/samples/   Copies of sample/*.zara (see below) served as static files.
+sample/          Example .zara programs (repo root; source of truth -- also
+                 copied into frontend/public/samples/ for the sample picker,
+                 and used directly by the backend CLI/tests).
+.claude/launch.json  Dev-server launch config (frontend on :5173) for this
+                     session's browser-preview tooling.
 PLAN.md          Phased build plan.
 PROGRESS.md      Checklist of what's done / in progress / not started.
 ```
 
-The Phase 0/2 restructure (flat `src/` -> Maven `backend/`) is done — see PROGRESS.md for exact status of later phases.
+The Phase 0/2 restructure (flat `src/` -> Maven `backend/`) and Phase 4 (frontend scaffold) are both done — see PROGRESS.md for exact status of every phase.
 
 ## ZARA language syntax
 
@@ -81,12 +89,13 @@ mvn test
 
 **Known local-environment quirk (Windows only):** on at least one Windows dev machine, `mvn spring-boot:run` fails at Tomcat startup with `java.io.IOException: Unable to establish loopback connection` coming from `sun.nio.ch.PipeImpl`/`WEPollSelectorProvider` -- a JDK-vs-Windows-networking issue in the NIO selector's internal wakeup pipe, unrelated to this project's code, and independent of which selector provider is forced. It reproduces identically for any NIO-based embedded server (Tomcat, Netty, Jetty), so switching servlet containers won't help. It has **not** been reproduced in Docker (Linux) and should not affect Render deployment (Phase 5) -- Render builds and runs the `Dockerfile` on Linux. If you hit this locally, use `mvn test` (MockMvc) to verify the API instead of a real running server, or test via Docker if the daemon is available.
 
-**Frontend (once scaffolded, Phase 4):**
+**Frontend:**
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+Reads the backend URL from `VITE_API_URL` (see `.env.example`; defaults to `http://localhost:8080` via `.env.local`). Because of the Windows loopback-socket quirk above, the real backend can't be run locally on this machine either -- the frontend's fetch/loading/error wiring was verified in the browser against a throwaway mock server matching the real `{output, error}` response shape (see PROGRESS.md Phase 4 for what was actually exercised). Full frontend-to-real-backend integration should be checked once either is reachable (Docker, another machine, or the Phase 5 deployment).
 
 ## Invariants that hold now that the backend API exists
 
