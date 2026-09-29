@@ -6,21 +6,31 @@ Context for Claude (or any future contributor) working in this repo. Read this f
 
 ZARA is a toy scripting language interpreter, originally built as a pure-Java, zero-dependency, console-only tree-walk interpreter (Tokenizer → Parser → Instruction tree → Environment) for an Advanced OOP course project. It is being turned into a full deployable web app: a Spring Boot backend exposing the interpreter over a REST API, and a React (Vite) frontend that's a browser-based ZARA playground (editor + Run button + output panel).
 
-## Target repo layout
+## Repo layout
 
 ```
-backend/        Spring Boot app (Maven). Contains the interpreter core (Tokenizer,
-                 Parser, Instruction/Expression tree, Environment, Interpreter) plus
-                 a REST controller wrapping it.
-frontend/        React + Vite SPA. Code editor, Run button, output/error panel,
-                 sample-program picker.
-sample/          Example .zara programs, used by both the CLI demo and the
-                 frontend's sample picker.
+backend/                              Spring Boot app (Maven).
+  src/main/java/com/zara/interpreter/  Interpreter core: Tokenizer, Parser,
+                                        Instruction/Expression tree, Environment,
+                                        Interpreter. Framework-agnostic -- no
+                                        Spring imports in this package, so it
+                                        keeps working as a standalone CLI too
+                                        (java -cp target/classes com.zara.interpreter.Interpreter <file>).
+  src/main/java/com/zara/api/          Spring layer: ZaraApiApplication (entry
+                                        point), RunController (POST /api/run),
+                                        ExecutionService (bounded executor +
+                                        timeout), CorsConfig, GlobalExceptionHandler.
+  src/test/java/...                    JUnit/MockMvc tests.
+  Dockerfile                           Multi-stage build -> runnable jar.
+frontend/        React + Vite SPA (Phase 4, not yet scaffolded). Code editor,
+                 Run button, output/error panel, sample-program picker.
+sample/          Example .zara programs (repo root, shared by the CLI demo and
+                 the future frontend's sample picker).
 PLAN.md          Phased build plan.
 PROGRESS.md      Checklist of what's done / in progress / not started.
 ```
 
-Until Phase 0 of the plan runs, the repo is still in its original flat `src/` layout — check PROGRESS.md before assuming the restructure has happened.
+The Phase 0/2 restructure (flat `src/` -> Maven `backend/`) is done — see PROGRESS.md for exact status of later phases.
 
 ## ZARA language syntax
 
@@ -49,18 +59,27 @@ Note: `otherwise:`, `while`, `!=`, `>=`, `<=`, `and/or/not`, and parentheses are
 
 ## Build & run
 
-**Backend (once restructured to Maven, Phase 2):**
+**Backend API:**
 ```bash
 cd backend
 mvn spring-boot:run
 ```
+Then `POST http://localhost:8080/api/run` with `{"code": "show 1 + 2"}`.
 
-**Backend (current flat layout, pre-restructure):**
+**Backend as a CLI (no Spring involved, same interpreter classes):**
 ```bash
-mkdir out
-javac src/*.java -d out
-java -cp out Interpreter sample/program1.zara
+cd backend
+mvn compile
+java -cp target/classes com.zara.interpreter.Interpreter ../sample/program1.zara
 ```
+
+**Backend tests** (MockMvc-based; exercises the controller/service/CORS stack without binding a real port -- see the note below on why):
+```bash
+cd backend
+mvn test
+```
+
+**Known local-environment quirk (Windows only):** on at least one Windows dev machine, `mvn spring-boot:run` fails at Tomcat startup with `java.io.IOException: Unable to establish loopback connection` coming from `sun.nio.ch.PipeImpl`/`WEPollSelectorProvider` -- a JDK-vs-Windows-networking issue in the NIO selector's internal wakeup pipe, unrelated to this project's code, and independent of which selector provider is forced. It reproduces identically for any NIO-based embedded server (Tomcat, Netty, Jetty), so switching servlet containers won't help. It has **not** been reproduced in Docker (Linux) and should not affect Render deployment (Phase 5) -- Render builds and runs the `Dockerfile` on Linux. If you hit this locally, use `mvn test` (MockMvc) to verify the API instead of a real running server, or test via Docker if the daemon is available.
 
 **Frontend (once scaffolded, Phase 4):**
 ```bash
@@ -69,10 +88,10 @@ npm install
 npm run dev
 ```
 
-## Invariants that must hold once the backend API exists
+## Invariants that hold now that the backend API exists
 
-- **No direct `System.out`/`System.err` in the interpreter core.** Instructions must write to a per-execution output buffer (passed through `Environment` or similar), never to the shared process stdout — the API serves concurrent requests and a shared stream would interleave/corrupt output between them.
-- **Every `/api/run` execution must be wall-clock bounded.** `loop N` is capped at 100,000 iterations, but `while` has no such cap — an infinite `while` must be stopped by a server-side execution timeout (not by the language itself), or a single bad request can hang a worker thread indefinitely.
+- **No direct `System.out`/`System.err` in the interpreter core.** Instructions write to a per-execution output buffer on `Environment`; `Interpreter.run()` returns it via `ExecutionResult{output, error}`. The parser's own recoverable "unexpected token" warnings go through the same path (`Parser.getWarnings()`), not a raw stream either. The API serves concurrent requests and a shared stream would interleave/corrupt output between them.
+- **Every `/api/run` execution is wall-clock bounded.** `ExecutionService` runs each request on a bounded executor with `Future.get(timeoutMs)` (default 5000ms, `zara.execution.timeout-ms`). `loop N` is separately capped at 100,000 iterations, but `while` has no such cap by design. `Future.cancel(true)` only *requests* interruption -- it can't force a running thread to stop -- so `WhileInstruction` and `RepeatInstruction` both check `Thread.currentThread().isInterrupted()` every iteration and throw if set. Without that cooperative check, a timed-out request would return a timeout response to the caller while its worker thread kept burning CPU forever in the background.
 - **The interpreter has no file I/O, network access, or reflection** — keep it that way. That's what makes exposing arbitrary user-submitted ZARA code over a public HTTP endpoint acceptable risk (the worst case is CPU/time exhaustion, which the timeout above handles).
 
 ## Working conventions
