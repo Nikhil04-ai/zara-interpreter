@@ -20,7 +20,7 @@ public class WhileInstruction implements Instruction {
             Object result = condition.evaluate(env);
 
             if (!(result instanceof Boolean)) {
-                throw new RuntimeException("Condition must evaluate to boolean but got: " + result);
+                throw new RuntimeException("Condition must evaluate to boolean but got: " + ValueFormat.format(result));
             }
 
             if (!(Boolean) result) break;

@@ -23,7 +23,7 @@ public class LogicalOpNode implements Expression {
 
     private boolean expectBoolean(Object value) {
         if (!(value instanceof Boolean)) {
-            throw new RuntimeException("Expected a boolean for '" + op + "' but got: " + value);
+            throw new RuntimeException("Expected a boolean for '" + op + "' but got: " + ValueFormat.format(value));
         }
         return (Boolean) value;
     }

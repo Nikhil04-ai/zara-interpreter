@@ -11,7 +11,7 @@ public class NotNode implements Expression {
         Object value = operand.evaluate(env);
 
         if (!(value instanceof Boolean)) {
-            throw new RuntimeException("Expected a boolean after 'not' but got: " + value);
+            throw new RuntimeException("Expected a boolean after 'not' but got: " + ValueFormat.format(value));
         }
 
         return !((Boolean) value);

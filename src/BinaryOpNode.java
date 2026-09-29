@@ -10,7 +10,7 @@ public class BinaryOpNode implements Expression {
         // Use formatValue() instead of toString() to avoid "105.0"
         // =========================================================
         "+", (l, r) -> isStringConcatenation(l, r)
-                ? formatValue(l) + formatValue(r)   // FIX
+                ? ValueFormat.format(l) + ValueFormat.format(r)   // FIX
                 : toDouble(l) + toDouble(r),
 
         "-", (l, r) -> toDouble(l) - toDouble(r),
@@ -85,19 +85,6 @@ public class BinaryOpNode implements Expression {
     // Check if string concatenation needed
     private static boolean isStringConcatenation(Object l, Object r) {
         return l instanceof String || r instanceof String;
-    }
-
-    // ========================= FIX 3 =========================
-    // Remove .0 from whole numbers when converting to String
-    // =========================================================
-    private static String formatValue(Object val) {
-        if (val instanceof Double) {
-            double d = (Double) val;
-            if (d == (int) d) {
-                return String.valueOf((int) d); // remove .0
-            }
-        }
-        return val.toString();
     }
 
     // Safe conversion to double

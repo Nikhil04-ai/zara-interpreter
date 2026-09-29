@@ -33,7 +33,7 @@ public class IfInstruction implements Instruction {
         // =======================================================
         if (!(result instanceof Boolean)) {
             throw new RuntimeException(
-                "Condition must evaluate to boolean but got: " + result
+                "Condition must evaluate to boolean but got: " + ValueFormat.format(result)
             );
         }
 
