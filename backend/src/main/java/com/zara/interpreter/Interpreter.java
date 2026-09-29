@@ -33,6 +33,15 @@ public class Interpreter {
 
         } catch (RuntimeException e) {
             return new ExecutionResult(env.getOutput(), e.getMessage());
+
+        } catch (StackOverflowError e) {
+            // The recursive-descent parser/evaluator has no explicit depth limit, so
+            // pathological input (e.g. thousands of nested parentheses) can exhaust the
+            // stack. StackOverflowError is an Error, not a RuntimeException, so it needs
+            // its own catch -- without this it escapes run() entirely, crashing the CLI
+            // with a raw trace and (via ExecutorService) surfacing as an opaque 500 from
+            // the API instead of a normal {output, error} result.
+            return new ExecutionResult(env.getOutput(), "Program is nested too deeply to evaluate");
         }
     }
 
