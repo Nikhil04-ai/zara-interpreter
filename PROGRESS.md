@@ -90,10 +90,13 @@ Full top-to-bottom verification across every layer, against a completely fresh `
 - **Remaining known limitations (not bugs, documented tradeoffs):** no native-OS-file-picker test automation exists in this environment, so the literal "user picks a file from a real OS dialog" step is inferred (via the page's render-loop blocking while the dialog is open) rather than directly observed -- the handler logic itself (everything after file selection) is fully verified. Phase 5 (actual Render/Vercel deployment) has not started -- all testing so far is against the local Docker stack.
 
 ## Phase 5 — Deploy
-- [ ] Backend deployed to Render, health check passing
-- [ ] Frontend deployed to Vercel
-- [ ] CORS updated to real frontend origin
-- [ ] End-to-end smoke test on live URLs
+
+- Google Cloud Run was evaluated and attempted first (explicitly requested over Render for learning value) -- code was updated (`server.port=${PORT:8080}`) and verified locally, but blocked on GCP billing-account activation on the user's end (common friction, especially card-verification issues). Switched to Render after repeated failed attempts; the port change is harmless/beneficial there too (Render also injects its own `PORT`).
+- [x] Backend deployed to Render — `zara-interpreter-c91n.onrender.com`, health check passing, verified via direct `curl` (`/actuator/health` → UP, `/api/run` → correct output)
+- [x] Frontend deployed to Vercel
+- [x] CORS already covers the deployed origin — `CorsConfig`'s `https://*.vercel.app` pattern confirmed via direct preflight test to correctly match real Vercel deployment URLs
+- [ ] End-to-end smoke test on live URLs — blocked by a real bug (next bullet), not yet re-confirmed after the fix
+- **Bug found and fixed (2026-10-02): deployed frontend showed "Could not reach the ZARA server" despite the backend being confirmed healthy.** Diagnosed by direct `curl` against the live Render URL (health + `/api/run` both worked perfectly), which ruled out the backend and pointed at something browser/CORS-specific. Confirmed root cause precisely: `VITE_API_URL` was set with a trailing slash in Vercel, so the frontend's request URL became `https://host.onrender.com//api/run` (double slash) -- verified directly that this exact path gets `403 Forbidden: Invalid CORS request` from the backend (our `CorsConfig` matches `/api/**`, not `//api/run`), and a CORS-rejected preflight makes the browser's `fetch()` reject with an opaque network error, which is exactly the generic message the frontend showed. Fixed defensively in [api.js](frontend/src/api.js): `API_BASE` now strips any trailing slash(es) regardless of how `VITE_API_URL` is entered, so this can't recur on any future deploy. Also de-duplicated a second copy of the same env-var-reading logic in `App.jsx` (now imports `API_BASE` from `api.js` instead of redefining it). Verified by building with a trailing-slash env var and confirming the normalization is applied in the output bundle before use. Vercel should auto-redeploy from the push; end-to-end re-verification on the live URL is the next step.
 
 ## Phase 6 — Polish
 - [ ] README rewritten with architecture + live links
