@@ -6,12 +6,12 @@ import { zaraLanguage } from './zaraLanguage'
 import { editorExtensions } from './editorTheme'
 import './App.css'
 
-const DEFAULT_CODE = `set score = 85
-when score > 50:
-    show "Passed"
-otherwise:
-    show "Failed"
-`
+// Blank by default -- a new visitor gets an empty editor (or whatever a share
+// link restores), not a pre-filled example. The placeholder below is just
+// grayed-out editor hint text, not real content, so it never gets submitted.
+const DEFAULT_CODE = ''
+
+const MAX_UPLOAD_BYTES = 1_000_000 // 1MB -- generous for a teaching-language program, cheap to guard
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
@@ -37,6 +37,7 @@ export default function App() {
   const [modal, setModal] = useState(null) // 'docs' | 'about' | null
   const [settingsOpen, setSettingsOpen] = useState(false)
   const toastTimer = useRef(null)
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -91,6 +92,37 @@ export default function App() {
     setResult(null)
     setNetworkError(null)
     setActiveSample(null)
+  }
+
+  function onUploadClick() {
+    fileInputRef.current?.click()
+  }
+
+  function onFileSelected(e) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // reset so selecting the same file again still fires onChange
+
+    if (!file) return
+
+    if (!file.name.toLowerCase().endsWith('.zara')) {
+      showToast('Please select a .zara file')
+      return
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      showToast('File is too large (max 1MB)')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      setCode(String(reader.result))
+      setResult(null)
+      setNetworkError(null)
+      setActiveSample(null)
+      showToast(`Loaded ${file.name}`)
+    }
+    reader.onerror = () => showToast(`Could not read ${file.name}`)
+    reader.readAsText(file)
   }
 
   // navigator.clipboard.writeText can reject (denied permission, insecure
@@ -219,6 +251,16 @@ export default function App() {
           </div>
 
           <div className="editor-toolbar">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".zara,text/plain"
+              onChange={onFileSelected}
+              className="visually-hidden"
+            />
+            <button className="icon-button small" onClick={onUploadClick} title="Upload a .zara file">
+              ⬆
+            </button>
             <button className="icon-button small" onClick={onCopyCode} title="Copy code">
               ⧉
             </button>
@@ -235,6 +277,7 @@ export default function App() {
             value={code}
             height="100%"
             theme="none"
+            placeholder="Write your ZARA code here, or load an example from the sidebar…"
             extensions={[zaraLanguage, ...editorExtensions]}
             onChange={(value) => {
               setCode(value)

@@ -26,10 +26,18 @@ export const zaraEditorTheme = EditorView.theme({
     fontSize: '14px',
     lineHeight: '1.6',
   },
+  // Both padded equally (not just .cm-content) so line numbers in the gutter
+  // stay aligned with their text -- this reserves space so the floating
+  // .editor-toolbar (copy/expand/upload icons) never overlaps line 1, which
+  // it otherwise does for any first line long enough to reach that corner.
+  '.cm-content': {
+    paddingTop: '34px',
+  },
   '.cm-gutters': {
     backgroundColor: 'transparent',
     border: 'none',
     color: 'var(--text-faint)',
+    paddingTop: '34px',
   },
   '.cm-activeLine': {
     backgroundColor: 'var(--active-line)',

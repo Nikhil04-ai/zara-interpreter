@@ -28,6 +28,8 @@ backend/                              Spring Boot app (Maven).
   .dockerignore                        Excludes target/.
 frontend/        React + Vite SPA -- a browser ZARA playground.
   src/App.jsx      Layout, run/loading/error state, Ctrl+Enter shortcut.
+                    Blank editor by default (DEFAULT_CODE = ''); supports
+                    uploading a local .zara file (validated: extension + 1MB cap).
   src/api.js       runZara(code) -- POSTs to VITE_API_URL + /api/run, throws
                     only on transport failure (a ZARA program error is a normal
                     200 with a non-null `error` field, not an exception).
