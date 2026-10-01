@@ -8,7 +8,7 @@ Status key: `[ ]` not started · `[~]` in progress · `[x]` done and verified
 
 ## Phase 0 — Repo setup
 - [x] git init + initial commit (commit `9f7388c`)
-- [~] GitHub repo created + pushed — decided: private repo named `zara-interpreter`, user publishing manually via GitHub Desktop (already installed); not blocking further work
+- [x] GitHub repo created + pushed (2026-10-01) — private repo `Nikhil04-ai/zara-interpreter`, `origin` configured, `master` up to date with all 13 commits
 - [x] Restructure into `backend/` — done as part of Phase 2 (see below), all interpreter classes moved to `backend/src/main/java/com/zara/interpreter/` with package declarations added
 
 ## Phase 1 — Interpreter fixes & extensions
