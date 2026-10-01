@@ -6,6 +6,10 @@ Context for Claude (or any future contributor) working in this repo. Read this f
 
 ZARA is a toy scripting language interpreter, originally built as a pure-Java, zero-dependency, console-only tree-walk interpreter (Tokenizer → Parser → Instruction tree → Environment) for an Advanced OOP course project. It is being turned into a full deployable web app: a Spring Boot backend exposing the interpreter over a REST API, and a React (Vite) frontend that's a browser-based ZARA playground (editor + Run button + output panel).
 
+**Live, deployed and verified (Phase 5, 2026-10-02):**
+- Frontend: https://zarainterpreter.vercel.app
+- Backend: https://zara-interpreter-c91n.onrender.com (free tier -- spins down after ~15 min idle, first request after that takes 30-60s to wake up)
+
 ## Repo layout
 
 ```
