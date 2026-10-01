@@ -20,7 +20,10 @@ backend/                              Spring Boot app (Maven).
                                         point), RunController (POST /api/run),
                                         ExecutionService (bounded executor +
                                         timeout), CorsConfig, GlobalExceptionHandler.
-  src/test/java/...                    JUnit/MockMvc tests.
+  src/test/java/com/zara/interpreter/  TokenizerTest, ParserTest, InterpreterTest --
+                                        direct unit tests, no subprocess/CLI involved.
+  src/test/java/com/zara/api/          RunControllerTest, RunControllerSafetyTest --
+                                        MockMvc integration tests (see note below on why).
   Dockerfile                           Multi-stage build -> runnable jar.
 frontend/        React + Vite SPA -- a browser ZARA playground.
   src/App.jsx      Layout, run/loading/error state, Ctrl+Enter shortcut.
@@ -81,7 +84,7 @@ mvn compile
 java -cp target/classes com.zara.interpreter.Interpreter ../sample/program1.zara
 ```
 
-**Backend tests** (MockMvc-based; exercises the controller/service/CORS stack without binding a real port -- see the note below on why):
+**Backend tests** (107 total: TokenizerTest/ParserTest/InterpreterTest run the interpreter directly with no subprocess; RunControllerTest/RunControllerSafetyTest use MockMvc, exercising the controller/service/CORS stack without binding a real port -- see the note below on why):
 ```bash
 cd backend
 mvn test

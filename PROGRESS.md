@@ -1,6 +1,6 @@
 # PROGRESS.md
 
-Tracks actual status against [PLAN.md](PLAN.md). Update this whenever a checklist item in the plan is genuinely done and verified (built/run/tested) — not just written. Last updated: 2026-09-29.
+Tracks actual status against [PLAN.md](PLAN.md). Update this whenever a checklist item in the plan is genuinely done and verified (built/run/tested) — not just written. Last updated: 2026-10-01.
 
 Status key: `[ ]` not started · `[~]` in progress · `[x]` done and verified
 
@@ -43,8 +43,13 @@ Status key: `[ ]` not started · `[~]` in progress · `[x]` done and verified
   - Re-verified after both fixes: all 20 API tests pass, `mvn package` builds a clean runnable jar, all 4 `sample/*.zara` + built-in demo still match exactly via the new `target/classes` location.
 
 ## Phase 3 — Tests
-- [~] `/api/run` integration tests — done early as part of Phase 2 verification (`RunControllerTest`, 5/5 passing)
-- [ ] Tokenizer/Parser/Interpreter unit tests (precedence, parens, otherwise, while) — the 64-case shell suite from Phase 1 covers this behaviorally; still need proper JUnit versions for CI
+- [x] `/api/run` integration tests — done early as part of Phase 2 verification (`RunControllerTest` + `RunControllerSafetyTest`, 20/20 passing)
+- [x] Tokenizer/Parser/Interpreter unit tests (2026-10-01) — **87 new JUnit tests**, direct (no subprocess/CLI), now permanently repo-tracked and run by `mvn test`/CI (the 64-case shell suite from Phase 1 only ever lived in scratchpad, never in git):
+  - [TokenizerTest.java](backend/src/test/java/com/zara/interpreter/TokenizerTest.java) (14 tests) — keywords vs identifiers, all operators incl. `!= >= <=` and parens, strings/numbers incl. error cases, comments, `\r\n` handling, line-number tracking.
+  - [ParserTest.java](backend/src/test/java/com/zara/interpreter/ParserTest.java) (8 tests) — top-level instruction types/counts, `otherwise`/`otherwise when` collapsing into one `IfInstruction`, syntax errors, and the warning-based recovery contract (`getWarnings()`). Deliberately does *not* try to assert deep nested-block tree shape, since `Instruction` subclasses expose no introspection into their bodies (would require adding getters to production code purely for tests) -- that behavior is verified through actual execution in `InterpreterTest` instead, which is the more meaningful signal anyway for a *runtime* correctness bug.
+  - [InterpreterTest.java](backend/src/test/java/com/zara/interpreter/InterpreterTest.java) (65 tests, `@Nested` by category) — ports every case from the Phase 1/2 manual test sessions (bug fixes, precedence, parens, conditionals, loop, while, comparisons, logic, tokenizer-through-execution, parser recovery, type coercion, nesting incl. the indentation-depth regression) plus the StackOverflowError safety case found during Phase 2's API testing.
+  - Expected `output` strings were reconstructed by hand with correct trailing newlines rather than copied from the shell suite's `expected` values, since bash's `$(...)` silently strips trailing newlines and the shell comparisons relied on that -- direct Java string comparison does not get that stripping for free. All 87 passed on the first run, confirming the manual reconstruction was accurate.
+  - Full suite (107 tests: 87 new + 20 API) passes via `mvn test`; `mvn package` still builds a clean jar.
 
 ## Phase 4 — Frontend
 - [x] Vite + React scaffold — `frontend/` (React 19, Vite 8), builds clean (`npm run build`, `npm run lint` both pass with zero issues)
