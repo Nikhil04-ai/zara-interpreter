@@ -44,6 +44,24 @@ export default function App() {
     localStorage.setItem('zara-theme', theme)
   }, [theme])
 
+  // codeFromShareLink() in useState above only runs once, on mount -- it
+  // won't catch the hash changing on an already-open tab (e.g. a same-document
+  // fragment navigation, or a user editing the URL bar directly). This keeps
+  // a share link working in that case too, not just on a fresh page load.
+  useEffect(() => {
+    function onHashChange() {
+      const restored = codeFromShareLink()
+      if (restored !== null) {
+        setCode(restored)
+        setResult(null)
+        setNetworkError(null)
+        setActiveSample(null)
+      }
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
+
   function showToast(message) {
     setToast(message)
     clearTimeout(toastTimer.current)
