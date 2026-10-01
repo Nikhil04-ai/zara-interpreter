@@ -213,6 +213,11 @@ export default function App() {
       <div className={`body ${expanded ? 'editor-expanded' : ''}`}>
         {!expanded && (
           <aside className="sidebar">
+            <button className="upload-button" onClick={onUploadClick}>
+              <span className="upload-button-icon">⬆</span>
+              Upload a .zara file
+            </button>
+
             <div className="sidebar-section-title">
               <span>Examples</span>
             </div>

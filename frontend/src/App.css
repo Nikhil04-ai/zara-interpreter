@@ -176,6 +176,31 @@
   overflow-y: auto;
 }
 
+.upload-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1.5px dashed var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.upload-button:hover {
+  border-color: var(--accent);
+  background: var(--accent-border);
+}
+
+.upload-button-icon {
+  font-size: 15px;
+}
+
 .sidebar-section-title {
   font-size: 11px;
   text-transform: uppercase;
@@ -183,6 +208,7 @@
   color: var(--text-faint);
   padding: 4px 8px;
   font-weight: 600;
+  margin-top: 4px;
 }
 
 .example-list {
