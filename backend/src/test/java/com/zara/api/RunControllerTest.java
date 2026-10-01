@@ -1,5 +1,6 @@
 package com.zara.api;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -115,6 +116,16 @@ class RunControllerTest {
         mockMvc.perform(get("/api/run"))
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(jsonPath("$.error").value(containsString("GET")));
+    }
+
+    @Test
+    @DisplayName("REGRESSION: hitting an unmapped static path (root, favicon) returns a plain 404, "
+            + "not a 500 wrapped in the API's error shape")
+    void unmappedStaticPathsReturnPlain404NotApiShaped500() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/favicon.ico"))
+                .andExpect(status().isNotFound());
     }
 
     // ===================== CORS =====================

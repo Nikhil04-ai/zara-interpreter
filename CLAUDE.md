@@ -25,6 +25,7 @@ backend/                              Spring Boot app (Maven).
   src/test/java/com/zara/api/          RunControllerTest, RunControllerSafetyTest --
                                         MockMvc integration tests (see note below on why).
   Dockerfile                           Multi-stage build -> runnable jar.
+  .dockerignore                        Excludes target/.
 frontend/        React + Vite SPA -- a browser ZARA playground.
   src/App.jsx      Layout, run/loading/error state, Ctrl+Enter shortcut.
   src/api.js       runZara(code) -- POSTs to VITE_API_URL + /api/run, throws
@@ -32,9 +33,14 @@ frontend/        React + Vite SPA -- a browser ZARA playground.
                     200 with a non-null `error` field, not an exception).
   src/samples.js    Sample-picker metadata + loader, fetches public/samples/*.zara.
   public/samples/   Copies of sample/*.zara (see below) served as static files.
+  Dockerfile        Multi-stage: Node build -> nginx serving the static dist/.
+                    VITE_API_URL must be passed as a build ARG (Vite bakes it
+                    into the JS at build time, not read at container start).
+  .dockerignore     Excludes node_modules/, dist/.
 sample/          Example .zara programs (repo root; source of truth -- also
                  copied into frontend/public/samples/ for the sample picker,
                  and used directly by the backend CLI/tests).
+docker-compose.yml    Runs backend + frontend together (see Build & run).
 .claude/launch.json  Dev-server launch config (frontend on :5173) for this
                      session's browser-preview tooling.
 PLAN.md          Phased build plan.
@@ -90,7 +96,7 @@ cd backend
 mvn test
 ```
 
-**Known local-environment quirk (Windows only):** on at least one Windows dev machine, `mvn spring-boot:run` fails at Tomcat startup with `java.io.IOException: Unable to establish loopback connection` coming from `sun.nio.ch.PipeImpl`/`WEPollSelectorProvider` -- a JDK-vs-Windows-networking issue in the NIO selector's internal wakeup pipe, unrelated to this project's code, and independent of which selector provider is forced. It reproduces identically for any NIO-based embedded server (Tomcat, Netty, Jetty), so switching servlet containers won't help. It has **not** been reproduced in Docker (Linux) and should not affect Render deployment (Phase 5) -- Render builds and runs the `Dockerfile` on Linux. If you hit this locally, use `mvn test` (MockMvc) to verify the API instead of a real running server, or test via Docker if the daemon is available.
+**Known local-environment quirk (Windows only):** on at least one Windows dev machine, `mvn spring-boot:run` fails at Tomcat startup with `java.io.IOException: Unable to establish loopback connection` coming from `sun.nio.ch.PipeImpl`/`WEPollSelectorProvider` -- a JDK-vs-Windows-networking issue in the NIO selector's internal wakeup pipe, unrelated to this project's code, and independent of which selector provider is forced. It reproduces identically for any NIO-based embedded server (Tomcat, Netty, Jetty), so switching servlet containers won't help. **Confirmed resolved by running via Docker instead** (see below) -- Docker containers run Linux, so this JDK/Windows-specific bug doesn't apply there. If Docker isn't available, use `mvn test` (MockMvc) to verify the API instead of a real running server.
 
 **Frontend:**
 ```bash
@@ -98,13 +104,23 @@ cd frontend
 npm install
 npm run dev
 ```
-Reads the backend URL from `VITE_API_URL` (see `.env.example`; defaults to `http://localhost:8080` via `.env.local`). Because of the Windows loopback-socket quirk above, the real backend can't be run locally on this machine either -- the frontend's fetch/loading/error wiring was verified in the browser against a throwaway mock server matching the real `{output, error}` response shape (see PROGRESS.md Phase 4 for what was actually exercised). Full frontend-to-real-backend integration should be checked once either is reachable (Docker, another machine, or the Phase 5 deployment).
+Reads the backend URL from `VITE_API_URL` (see `.env.example`; defaults to `http://localhost:8080` via `.env.local`).
+
+**Full stack via Docker (recommended for local end-to-end testing):**
+```bash
+docker compose up --build
+```
+Frontend at `http://localhost:3000`, backend at `http://localhost:8080`. This is the only way to test the real frontend against the real backend on a Windows dev machine (see the quirk above) -- confirmed working end-to-end (2026-10-01): sample picker, successful runs, and error rendering (incl. partial output) all verified correct through the live containers, not a mock.
 
 ## Invariants that hold now that the backend API exists
 
 - **No direct `System.out`/`System.err` in the interpreter core.** Instructions write to a per-execution output buffer on `Environment`; `Interpreter.run()` returns it via `ExecutionResult{output, error}`. The parser's own recoverable "unexpected token" warnings go through the same path (`Parser.getWarnings()`), not a raw stream either. The API serves concurrent requests and a shared stream would interleave/corrupt output between them.
 - **Every `/api/run` execution is wall-clock bounded.** `ExecutionService` runs each request on a bounded executor with `Future.get(timeoutMs)` (default 5000ms, `zara.execution.timeout-ms`). `loop N` is separately capped at 100,000 iterations, but `while` has no such cap by design. `Future.cancel(true)` only *requests* interruption -- it can't force a running thread to stop -- so `WhileInstruction` and `RepeatInstruction` both check `Thread.currentThread().isInterrupted()` every iteration and throw if set. Without that cooperative check, a timed-out request would return a timeout response to the caller while its worker thread kept burning CPU forever in the background.
 - **The interpreter has no file I/O, network access, or reflection** — keep it that way. That's what makes exposing arbitrary user-submitted ZARA code over a public HTTP endpoint acceptable risk (the worst case is CPU/time exhaustion, which the timeout above handles).
+
+## A gotcha worth not repeating
+
+`GlobalExceptionHandler` (`com.zara.api`) is a `@RestControllerAdvice` with a catch-all `@ExceptionHandler(Exception.class)`. **An unscoped `@RestControllerAdvice` applies to the entire application context, not just your own controllers** -- it was once wrongly intercepting Spring's own `NoResourceFoundException` (thrown for any unmatched static path, e.g. `/` or `/favicon.ico`) and turning a normal 404 into a 500 in our API's error shape. The instinctive fix -- `@RestControllerAdvice(assignableTypes = RunController.class)` -- was tried and **reverted**: it also stopped `HttpRequestMethodNotSupportedException` (e.g. `GET /api/run`) from being handled, silently dropping back to Spring's bodyless default response and losing the `{output,error}` shape for that case too (caught by `mvn test`, not by inspection). The correct pattern, now in place: keep the advice unscoped, and give the *specific* exception you don't want it touching (`NoResourceFoundException`) its own `@ExceptionHandler` earlier in the class, so the generic catch-all never sees it. If you add more infrastructure-level exceptions to carve out in the future, follow that same pattern rather than trying to scope the whole advice.
 
 ## Working conventions
 
