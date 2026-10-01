@@ -411,7 +411,6 @@ function About() {
         The interpreter is a classic three-stage pipeline &mdash; Tokenizer &rarr; Parser &rarr; Evaluator
         &mdash; wired up behind a Spring Boot API, with this playground as its frontend.
       </p>
-      <p className="muted">Originally built as a group project for the Advanced OOP course at Sitare University.</p>
     </div>
   )
 }
