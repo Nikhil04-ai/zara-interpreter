@@ -1,4 +1,10 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+// Strip any trailing slash(es) -- a VITE_API_URL entered as
+// "https://host.com/" (an easy, common mistake) would otherwise produce a
+// double-slash request URL ("https://host.com//api/run"), which fails CORS
+// entirely (the backend's CORS config matches "/api/**", not "//api/run"),
+// surfacing as an opaque "could not reach the server" network error that
+// gives no hint the real issue is just a trailing slash in the configured URL.
+export const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replace(/\/+$/, '')
 
 // Runs ZARA source against the backend's POST /api/run endpoint.
 // Throws only for network/transport failures (backend unreachable) -- a ZARA

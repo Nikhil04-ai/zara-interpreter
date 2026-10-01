@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
-import { runZara } from './api'
+import { runZara, API_BASE } from './api'
 import { SAMPLES, loadSample } from './samples'
 import { zaraLanguage } from './zaraLanguage'
 import { editorExtensions } from './editorTheme'
@@ -12,8 +12,6 @@ import './App.css'
 const DEFAULT_CODE = ''
 
 const MAX_UPLOAD_BYTES = 1_000_000 // 1MB -- generous for a teaching-language program, cheap to guard
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
 function codeFromShareLink() {
   const match = window.location.hash.match(/code=([^&]+)/)
